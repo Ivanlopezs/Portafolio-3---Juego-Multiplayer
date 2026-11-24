@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d97568aae3acb2245bad180d7ac896e9, type: 3}
+  m_Name: Organism_Frog
+  m_EditorClassIdentifier: Assembly-CSharp::OrganismData
+  organismType: 4
+  organismName: Rana
+  description: 'Un animal vertebrado anfibio del orden Anura que se caracteriza por
+    tener un cuerpo corto y compacto. '
+  organismSprite: {fileID: 2820143329777312509, guid: ffb2700e929cf1b479f073db19d8e5e0, type: 3}

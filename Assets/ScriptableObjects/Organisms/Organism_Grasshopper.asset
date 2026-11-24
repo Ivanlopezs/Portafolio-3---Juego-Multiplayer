@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d97568aae3acb2245bad180d7ac896e9, type: 3}
+  m_Name: Organism_Grasshopper
+  m_EditorClassIdentifier: Assembly-CSharp::OrganismData
+  organismType: 1
+  organismName: Saltamontes
+  description: "Un insecto herb\xEDvoro de cuerpo alargado, antenas cortas y patas
+    traseras largas y fuertes dise\xF1adas para dar grandes saltos."
+  organismSprite: {fileID: -5893975051605041190, guid: 2c7f48d1671ce544c84f6cb8a3ce099a, type: 3}
