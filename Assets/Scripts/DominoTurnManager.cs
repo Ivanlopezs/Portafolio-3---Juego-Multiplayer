@@ -47,16 +47,12 @@ public class DominoTurnManager : MonoBehaviour
 
     public int ReserveCount => reserve != null ? reserve.Count : 0;
 
-    // Inicialización de las reglas.
     private void Awake()
     {
-        IOrganismCompatibilityStrategy compatibility =
-            new EcosystemCompatibilityStrategy();
-
+        IOrganismCompatibilityStrategy compatibility = new EcosystemCompatibilityStrategy();
         rules = new DominoRules(compatibility);
     }
 
-    // Inicializa automáticamente la partida.
     private void Start()
     {
         if (initializeOnStart)
@@ -65,7 +61,6 @@ public class DominoTurnManager : MonoBehaviour
         }
     }
 
-    // Inicializa una nueva partida.
     public void InitializeTurnSystem()
     {
         if (gameSetup == null || boardManager == null)
@@ -74,75 +69,48 @@ public class DominoTurnManager : MonoBehaviour
             return;
         }
 
-        // Reiniciar la selección y los botones.
         selectedTile = null;
         UpdatePlacementButtons();
 
-        // Repartir las fichas.
         gameSetup.InitializeGame();
 
-        // Preparar el tablero.
         boardManager.InitializeBoard();
 
-        // Obtener jugadores y reserva.
         players = gameSetup.Players;
         reserve = gameSetup.Reserve;
 
-        currentPlayerIndex = 0;
-
         if (players == null || players.Count == 0)
         {
-            Debug.LogError("No existen jugadores para iniciar la partida.");
+            Debug.LogError("No hay jugadores disponibles.");
             return;
         }
 
-        // Colocar automáticamente la primera ficha.
-        PlayerData firstPlayer = CurrentPlayer;
-
-        if (firstPlayer.hand.TileCount > 0)
+        if (reserve == null || reserve.Count == 0)
         {
-            DominoTile firstTile = firstPlayer.hand.Tiles[0];
-
-            DominoBoardMoveResult result =
-                boardManager.TryPlaceTile(
-                    firstTile,
-                    DominoPlacementSide.Right
-                );
-
-            if (result.IsValid)
-            {
-                firstPlayer.hand.RemoveTile(firstTile);
-
-                Debug.Log(
-                    "Primera ficha colocada automáticamente: " +
-                    firstTile.leftOrganism + " - " +
-                    firstTile.rightOrganism
-                );
-
-                // El turno pasa al siguiente jugador.
-                currentPlayerIndex =
-                    (currentPlayerIndex + 1) % players.Count;
-            }
-            else
-            {
-                Debug.LogError(
-                    "No se pudo colocar la primera ficha: " +
-                    result.Explanation
-                );
-            }
+            Debug.LogError("No hay fichas disponibles en la reserva.");
+            return;
         }
+
+        int randomIndex = Random.Range(0, reserve.Count);
+        DominoTile firstTile = reserve[randomIndex];
+        DominoBoardMoveResult result = boardManager.TryPlaceTile(firstTile, DominoPlacementSide.Right);
+
+        if (!result.IsValid)
+        {
+            Debug.LogError("No se pudo colocar la primera ficha: " + result.Explanation);
+            return;
+        }
+
+        reserve.RemoveAt(randomIndex);
+        currentPlayerIndex = 0;
 
         UpdateTurnUI();
 
-        ShowFeedback("¡Comienza la partida!");
+        ShowFeedback("¡Comienza la partida! Se colocó una ficha inicial aleatoria.");
 
-        Debug.Log(
-            "Sistema de turnos inicializado. Comienza " +
-            CurrentPlayer.playerName
-        );
+        Debug.Log("Primera ficha colocada: " + firstTile.leftOrganism + " - " + firstTile.rightOrganism);
     }
 
-    // Comprueba si una ficha puede conectarse al tablero.
     public bool CanPlayTile(DominoTile tile)
     {
         if (tile == null || boardManager == null)
@@ -153,19 +121,16 @@ public class DominoTurnManager : MonoBehaviour
         if (board.IsEmpty)
             return true;
 
-        DominoMoveResult rightResult =
-            rules.ValidateMove(tile, board.RightOpenEnd);
+        DominoMoveResult rightResult = rules.ValidateMove(tile, board.RightOpenEnd);
 
         if (rightResult.IsValid)
             return true;
 
-        DominoMoveResult leftResult =
-            rules.ValidateMove(tile, board.LeftOpenEnd);
+        DominoMoveResult leftResult = rules.ValidateMove(tile, board.LeftOpenEnd);
 
         return leftResult.IsValid;
     }
 
-    // Comprueba si el jugador actual tiene alguna jugada.
     public bool CanCurrentPlayerPlay()
     {
         if (CurrentPlayer == null)
@@ -180,7 +145,6 @@ public class DominoTurnManager : MonoBehaviour
         return false;
     }
 
-    // Selecciona una ficha de la mano.
     public void SelectTile(DominoTile tile)
     {
         if (tile == null || CurrentPlayer == null)
@@ -191,11 +155,9 @@ public class DominoTurnManager : MonoBehaviour
 
         selectedTile = tile;
 
-        bool canPlaceLeft =
-            CanPlaceOnSide(tile, DominoPlacementSide.Left);
+        bool canPlaceLeft = CanPlaceOnSide(tile, DominoPlacementSide.Left);
 
-        bool canPlaceRight =
-            CanPlaceOnSide(tile, DominoPlacementSide.Right);
+        bool canPlaceRight = CanPlaceOnSide(tile, DominoPlacementSide.Right);
 
         if (placeLeftButton != null)
             placeLeftButton.interactable = canPlaceLeft;
@@ -203,12 +165,9 @@ public class DominoTurnManager : MonoBehaviour
         if (placeRightButton != null)
             placeRightButton.interactable = canPlaceRight;
 
-        ShowFeedback(
-            "Ficha seleccionada. Elige dónde quieres colocarla."
-        );
+        ShowFeedback("Ficha seleccionada. Elige dónde quieres colocarla.");
     }
 
-    // Comprueba la compatibilidad con un extremo específico.
     private bool CanPlaceOnSide(
         DominoTile tile,
         DominoPlacementSide side)
@@ -229,19 +188,16 @@ public class DominoTurnManager : MonoBehaviour
         return rules.ValidateMove(tile, openEnd).IsValid;
     }
 
-    // Botón para colocar a la izquierda.
     public void PlaceSelectedTileLeft()
     {
         PlaceSelectedTile(DominoPlacementSide.Left);
     }
 
-    // Botón para colocar a la derecha.
     public void PlaceSelectedTileRight()
     {
         PlaceSelectedTile(DominoPlacementSide.Right);
     }
 
-    // Coloca la ficha seleccionada en el extremo elegido.
     private void PlaceSelectedTile(DominoPlacementSide side)
     {
         if (selectedTile == null)
@@ -252,16 +208,13 @@ public class DominoTurnManager : MonoBehaviour
 
         if (!CanPlaceOnSide(selectedTile, side))
         {
-            ShowFeedback(
-                "No existe compatibilidad en ese extremo."
-            );
+            ShowFeedback("No existe compatibilidad en ese extremo.");
             return;
         }
 
         TryPlayTile(selectedTile, side);
     }
 
-    // Ejecuta la colocación de una ficha.
     public bool TryPlayTile(
         DominoTile tile,
         DominoPlacementSide side)
