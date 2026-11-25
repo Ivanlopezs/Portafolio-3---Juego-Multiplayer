@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -11,6 +12,9 @@ public class DominoTileView : MonoBehaviour
     [Header("Right Side")]
     [SerializeField] private Image rightOrganismImage;
     [SerializeField] private TMP_Text rightOrganismName;
+
+    [Header("Interaction")]
+    [SerializeField] private Button tileButton;
 
     public DominoTile TileData { get; private set; }
 
@@ -41,4 +45,20 @@ public class DominoTileView : MonoBehaviour
             rightOrganismName.text = rightData.organismName;
         }
     }
+
+    public void SetClickAction(Action<DominoTile> onClick)
+    {
+        if (tileButton == null)
+        {
+            Debug.LogError("No se asignó el Button de la ficha.");
+            return;
+        }
+
+        tileButton.onClick.RemoveAllListeners();
+
+        tileButton.onClick.AddListener(() =>
+        {
+            onClick?.Invoke(TileData);
+        });
+}
 }

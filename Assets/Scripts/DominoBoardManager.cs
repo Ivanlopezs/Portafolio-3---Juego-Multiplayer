@@ -33,7 +33,7 @@ public class DominoBoardManager : MonoBehaviour
         Debug.Log("Tablero preparado correctamente.");
     }
 
-    public DominoBoardMoveResult TryPlaceTile(DominoTile tile)
+    public DominoBoardMoveResult TryPlaceTile(DominoTile tile, DominoPlacementSide side)
     {
         if (tile == null)
         {
@@ -45,7 +45,7 @@ public class DominoBoardManager : MonoBehaviour
             return new DominoBoardMoveResult(false, false, false, "Esta ficha ya fue colocada en el tablero.");
         }
 
-        DominoBoardMoveResult result = board.TryPlaceTile(tile, rules);
+        DominoBoardMoveResult result = board.TryPlaceTile(tile, rules, side);
 
         if (!result.IsValid)
         {
@@ -79,25 +79,5 @@ public class DominoBoardManager : MonoBehaviour
             DominoTileView newView = Instantiate(tilePrefab, boardTilesContainer);
             newView.Setup(tile, leftData, rightData, boardTile.ReverseVisual);
         }
-    }
-
-    [ContextMenu("Initialize Test Board")]
-    private void TestInitializeBoard()
-    {
-        InitializeBoard();
-    }
-
-    [ContextMenu("Place Selected Test Tile")]
-    private void TestPlaceTile()
-    {
-        DominoTile selectedTile = testTiles.Find(tile => tile.tileID == testTileID);
-
-        if (selectedTile == null)
-        {
-            Debug.LogError("No se encontró la ficha con ID: " + testTileID + ". Primero inicializa el tablero.");
-            return;
-        }
-
-        TryPlaceTile(selectedTile);
     }
 }
