@@ -81,6 +81,13 @@ public class DominoTileFactory : MonoBehaviour
         return null;
     }
 
+
+    public OrganismData GetOrganismData(OrganismType type)
+    {
+        return FindOrganismData(type);
+    }
+
+
     [ContextMenu("Generate Tile Preview")]
     public void GeneratePreview()
     {

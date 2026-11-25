@@ -12,12 +12,33 @@ public class DominoTileView : MonoBehaviour
     [SerializeField] private Image rightOrganismImage;
     [SerializeField] private TMP_Text rightOrganismName;
 
-    public void Setup(DominoTile tile, OrganismData leftData, OrganismData rightData)
-    {
-        leftOrganismImage.sprite = leftData.organismSprite;
-        leftOrganismName.text = leftData.organismName;
+    public DominoTile TileData { get; private set; }
 
-        rightOrganismImage.sprite = rightData.organismSprite;
-        rightOrganismName.text = rightData.organismName;
+    public void Setup(DominoTile tile, OrganismData leftData, OrganismData rightData, bool reverseVisual = false)
+    {
+        TileData = tile;
+
+        if (tile == null || leftData == null || rightData == null)
+        {
+            Debug.LogError("No se pudo configurar la vista de la ficha.");
+            return;
+        }
+
+        if (reverseVisual)
+        {
+            leftOrganismImage.sprite = rightData.organismSprite;
+            leftOrganismName.text = rightData.organismName;
+
+            rightOrganismImage.sprite = leftData.organismSprite;
+            rightOrganismName.text = leftData.organismName;
+        }
+        else
+        {
+            leftOrganismImage.sprite = leftData.organismSprite;
+            leftOrganismName.text = leftData.organismName;
+
+            rightOrganismImage.sprite = rightData.organismSprite;
+            rightOrganismName.text = rightData.organismName;
+        }
     }
 }
