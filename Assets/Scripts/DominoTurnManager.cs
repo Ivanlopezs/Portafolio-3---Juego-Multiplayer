@@ -1,14 +1,16 @@
-
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Photon.Pun;
+using Photon.Realtime;
 
 public class DominoTurnManager : MonoBehaviour
 {
     [Header("Game References")]
     [SerializeField] private DominoGameSetup gameSetup;
     [SerializeField] private DominoBoardManager boardManager;
+    [SerializeField] private PhotonGameSyncManager photonGameSyncManager;
 
     [Header("Game Settings")]
     [SerializeField] private bool initializeOnStart = true;
@@ -53,16 +55,43 @@ public class DominoTurnManager : MonoBehaviour
         rules = new DominoRules(compatibility);
     }
 
+    
     private void Start()
     {
-        if (initializeOnStart)
+        if (GameSettings.SelectedMode == GameMode.Local)
         {
-            InitializeTurnSystem();
+            if (initializeOnStart)
+            {
+                InitializeTurnSystem();
+            }
+        }
+        else if (GameSettings.SelectedMode == GameMode.Online)
+        {
+            Debug.Log("Modo online: preparando la partida.");
+
+            if (PhotonNetwork.IsMasterClient)
+            {
+                InitializeOnlineTurnSystem();
+            }
+            else
+            {
+                ShowFeedback("Esperando a que el anfitrión prepare la partida...");
+            }
         }
     }
 
+
     public void InitializeTurnSystem()
     {
+        if (GameSettings.SelectedMode == GameMode.Online)
+        {
+            Debug.LogWarning(
+                "No se puede inicializar una partida local durante el modo online."
+            );
+
+            return;
+        }
+
         if (gameSetup == null || boardManager == null)
         {
             Debug.LogError("Faltan referencias del sistema de turnos.");
@@ -110,6 +139,76 @@ public class DominoTurnManager : MonoBehaviour
 
         Debug.Log("Primera ficha colocada: " + firstTile.leftOrganism + " - " + firstTile.rightOrganism);
     }
+
+    private void InitializeOnlineTurnSystem()
+    {
+        if (!PhotonNetwork.InRoom)
+        {
+            Debug.LogError("No estás dentro de una sala online.");
+            return;
+        }
+
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            Debug.LogWarning("Solo el anfitrión puede preparar la partida.");
+            return;
+        }
+
+        if (gameSetup == null ||
+            boardManager == null ||
+            photonGameSyncManager == null)
+        {
+            Debug.LogError("Faltan referencias para iniciar la partida online.");
+            return;
+        }
+
+        int onlinePlayerCount = PhotonNetwork.CurrentRoom.MaxPlayers;
+
+        gameSetup.InitializeOnlineGame(onlinePlayerCount);
+
+        players = gameSetup.Players;
+        reserve = gameSetup.Reserve;
+
+        if (players == null || players.Count != onlinePlayerCount)
+        {
+            Debug.LogError("No se pudieron preparar los jugadores online.");
+            return;
+        }
+
+        if (reserve == null)
+        {
+            Debug.LogError("No se pudo preparar la reserva.");
+            return;
+        }
+
+        boardManager.InitializeOnlineBoard();
+
+        if (reserve.Count == 0)
+        {
+            Debug.LogError("No hay fichas disponibles para iniciar el tablero.");
+            return;
+        }
+
+        int randomIndex = Random.Range(0, reserve.Count);
+
+        DominoTile firstTile = reserve[randomIndex];
+
+        reserve.RemoveAt(randomIndex);
+
+        photonGameSyncManager.BroadcastInitialTile(firstTile);
+
+        currentPlayerIndex = 0;
+        selectedTile = null;
+
+        UpdatePlacementButtons();
+
+        photonGameSyncManager.DistributePrivateHands();
+
+        ShowFeedback("Partida online preparada. Ficha inicial sincronizada.");
+
+        Debug.Log("El anfitrión preparó la partida online correctamente.");
+    }
+
 
     public bool CanPlayTile(DominoTile tile)
     {
@@ -238,6 +337,24 @@ public class DominoTurnManager : MonoBehaviour
             return false;
         }
 
+        if (GameSettings.SelectedMode == GameMode.Online)
+        {
+            if (photonGameSyncManager == null)
+            {
+                Debug.LogError("No se ha asignado PhotonGameSyncManager.");
+                return false;
+            }
+
+            photonGameSyncManager.RequestOnlineMove(tile, side);
+
+            ShowFeedback("Enviando jugada al anfitrión...");
+
+            selectedTile = null;
+            UpdatePlacementButtons();
+
+            return true;
+        }
+
         DominoBoardMoveResult result =
             boardManager.TryPlaceTile(tile, side);
 
@@ -268,7 +385,6 @@ public class DominoTurnManager : MonoBehaviour
         return true;
     }
 
-    // Roba fichas hasta encontrar una jugable o agotar la reserva.
     public void DrawUntilPlayable()
     {
         if (CurrentPlayer == null)
@@ -327,7 +443,6 @@ public class DominoTurnManager : MonoBehaviour
         Debug.Log("Fichas robadas: " + drawnTiles);
     }
 
-    // Permite pasar si no quedan fichas en la reserva.
     public void PassTurn()
     {
         if (CurrentPlayer == null)
@@ -358,7 +473,6 @@ public class DominoTurnManager : MonoBehaviour
         AdvanceTurn();
     }
 
-    // Cambia al siguiente jugador.
     private void AdvanceTurn()
     {
         currentPlayerIndex++;
@@ -378,7 +492,6 @@ public class DominoTurnManager : MonoBehaviour
         );
     }
 
-    // Actualiza los botones de colocación.
     private void UpdatePlacementButtons()
     {
         if (placeLeftButton != null)
@@ -388,7 +501,6 @@ public class DominoTurnManager : MonoBehaviour
             placeRightButton.interactable = false;
     }
 
-    // Actualiza la interfaz del juego.
     private void UpdateTurnUI()
     {
         if (CurrentPlayer != null && currentPlayerText != null)
@@ -405,23 +517,172 @@ public class DominoTurnManager : MonoBehaviour
 
         if (playerHandUI != null && CurrentPlayer != null)
         {
-            playerHandUI.ShowHand(CurrentPlayer.hand);
+            PlayerHand handToShow = CurrentPlayer.hand;
+
+            if (GameSettings.SelectedMode == GameMode.Online &&
+                photonGameSyncManager != null)
+            {
+                int localIndex = photonGameSyncManager.LocalPlayerIndex;
+
+                if (localIndex >= 0 && localIndex < players.Count)
+                {
+                    handToShow = players[localIndex].hand;
+                }
+            }
+
+            playerHandUI.ShowHand(handToShow);
         }
     }
 
-    // Botón Robar.
+    public void OnOnlineHandReceived(int playerIndex)
+    {
+        players = gameSetup.Players;
+        reserve = gameSetup.Reserve;
+
+        if (playerIndex < 0 || playerIndex >= players.Count)
+        {
+            Debug.LogError("Índice de jugador recibido inválido.");
+            return;
+        }
+
+        if (playerHandUI != null)
+        {
+            playerHandUI.ShowHand(players[playerIndex].hand);
+        }
+
+        Debug.Log(
+            "Mano online recibida correctamente para: " +
+            players[playerIndex].playerName
+        );
+
+        ShowFeedback("Tus fichas fueron recibidas correctamente.");
+    }
+
+    public void ValidateOnlineMoveRequest(
+        int actorNumber,
+        int tileID,
+        int sideValue)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        if (sideValue != (int)DominoPlacementSide.Left &&
+            sideValue != (int)DominoPlacementSide.Right)
+        {
+            return;
+        }
+
+        Player[] roomPlayers = PhotonNetwork.PlayerList;
+        int actorIndex = -1;
+
+        for (int i = 0; i < roomPlayers.Length; i++)
+        {
+            if (roomPlayers[i].ActorNumber == actorNumber)
+            {
+                actorIndex = i;
+                break;
+            }
+        }
+
+        if (actorIndex == -1)
+        {
+            Debug.LogWarning("No se encontró al jugador que solicitó la jugada.");
+            return;
+        }
+
+        if (actorIndex != currentPlayerIndex)
+        {
+            Debug.LogWarning("El jugador intentó jugar fuera de su turno.");
+            return;
+        }
+
+        PlayerData requestingPlayer = players[actorIndex];
+
+        DominoTile tile = requestingPlayer.hand.Tiles.Find(
+            t => t.tileID == tileID
+        );
+
+        if (tile == null)
+        {
+            Debug.LogWarning("El jugador intentó utilizar una ficha que no posee.");
+            return;
+        }
+
+        DominoPlacementSide side = (DominoPlacementSide)sideValue;
+
+        if (!CanPlaceOnSide(tile, side))
+        {
+            Debug.LogWarning("La ficha no es compatible con el extremo seleccionado.");
+            return;
+        }
+
+        photonGameSyncManager.BroadcastAcceptedMove(
+            tile,
+            side,
+            actorIndex
+        );
+    }
+
+    public void ApplySynchronizedOnlineMove(
+        int playerIndex,
+        DominoTile tile,
+        DominoPlacementSide side)
+    {
+        if (players == null ||
+            playerIndex < 0 ||
+            playerIndex >= players.Count)
+        {
+            Debug.LogError("Jugador inválido al sincronizar la jugada.");
+            return;
+        }
+
+        if (playerIndex != currentPlayerIndex)
+        {
+            Debug.LogWarning("La jugada recibida no corresponde al turno actual.");
+            return;
+        }
+
+        DominoBoardMoveResult result = boardManager.TryPlaceTile(tile, side);
+
+        if (result == null || !result.IsValid)
+        {
+            Debug.LogError("No se pudo sincronizar la jugada: " +
+                        (result != null ? result.Explanation : "Resultado nulo."));
+            return;
+        }
+
+        PlayerHand actorHand = players[playerIndex].hand;
+
+        DominoTile ownedTile = actorHand.Tiles.Find(
+            t => t.tileID == tile.tileID
+        );
+
+        if (ownedTile != null)
+        {
+            actorHand.RemoveTile(ownedTile);
+        }
+
+        selectedTile = null;
+
+        Debug.Log(
+            players[playerIndex].playerName +
+            " colocó una ficha en " + side
+        );
+
+        currentPlayerIndex = playerIndex;
+        AdvanceTurn();
+    }
+
     public void OnDrawButtonClicked()
     {
         DrawUntilPlayable();
     }
 
-    // Botón Pasar.
     public void OnPassButtonClicked()
     {
         PassTurn();
     }
 
-    // Botón Reiniciar.
     public void OnRestartButtonClicked()
     {
         InitializeTurnSystem();
@@ -431,7 +692,6 @@ public class DominoTurnManager : MonoBehaviour
         );
     }
 
-    // Muestra mensajes en la interfaz y consola.
     private void ShowFeedback(string message)
     {
         Debug.Log(message);

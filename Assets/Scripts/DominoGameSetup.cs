@@ -4,25 +4,44 @@ using UnityEngine;
 public class DominoGameSetup : MonoBehaviour
 {
     [Header("Game Configuration")]
-    [SerializeField, Range(2, 4)]
-    private int playerCount = 2;
+    [SerializeField, Range(2, 4)] private int playerCount = 2;
 
     [Header("References")]
-    [SerializeField]
-    private DominoTileFactory tileFactory;
+    [SerializeField] private DominoTileFactory tileFactory;
+
     private List<PlayerData> players = new List<PlayerData>();
     private List<DominoTile> reserve = new List<DominoTile>();
     private DominoDealer dealer = new DominoDealer();
+
     public List<PlayerData> Players => players;
     public List<DominoTile> Reserve => reserve;
 
+    
     public void InitializeGame()
+    {
+        playerCount = GameSettings.PlayerCount;
+        InitializeGameData();
+    }
+
+    public void InitializeOnlineGame(int onlinePlayerCount)
+    {
+        if (onlinePlayerCount < 2 || onlinePlayerCount > 4)
+        {
+            Debug.LogError("La cantidad de jugadores online debe estar entre 2 y 4.");
+            return;
+        }
+
+        playerCount = onlinePlayerCount;
+        InitializeGameData();
+    }
+
+    private void InitializeGameData()
     {
         List<DominoTile> allTiles = tileFactory.GenerateTiles();
 
         if (allTiles.Count != 28)
         {
-            Debug.LogError("No se pudo preparar la partida. " + "Se necesitan exactamente 28 fichas.");
+            Debug.LogError("No se generaron las 28 fichas necesarias.");
             return;
         }
 
@@ -35,14 +54,14 @@ public class DominoGameSetup : MonoBehaviour
         PrintGameSetup();
     }
 
+
     private void CreatePlayers()
     {
         players.Clear();
 
         for (int i = 0; i < playerCount; i++)
         {
-            PlayerData player = new PlayerData(i, "Jugador " + (i + 1));
-            players.Add(player);
+            players.Add(new PlayerData(i, "Jugador " + (i + 1)));
         }
     }
 
@@ -56,21 +75,55 @@ public class DominoGameSetup : MonoBehaviour
 
     private void PrintGameSetup()
     {
-        Debug.Log("========== PARTIDA PREPARADA ==========");
-        Debug.Log("Cantidad de jugadores: " + players.Count);
+        Debug.Log("========== CONFIGURACIÓN DE PARTIDA ==========");
 
         foreach (PlayerData player in players)
         {
-            Debug.Log(player.playerName + " tiene " + player.hand.TileCount + " fichas.");
-
-            foreach (DominoTile tile in player.hand.Tiles)
-            {
-                Debug.Log("Ficha ID: " + tile.tileID + " | " + tile.leftOrganism + " - " + tile.rightOrganism);
-            }
+            Debug.Log(
+                player.playerName +
+                " recibió " +
+                player.hand.TileCount +
+                " fichas."
+            );
         }
 
-        Debug.Log("Fichas en la reserva: " + reserve.Count);
-        Debug.Log("=======================================");
+        Debug.Log("Fichas restantes en la reserva: " + reserve.Count);
+        Debug.Log("==============================================");
+    }
+
+    public void PrepareOnlinePlayers(int onlinePlayerCount)
+    {
+        if (onlinePlayerCount < 2 || onlinePlayerCount > 4)
+        {
+            Debug.LogError("La cantidad de jugadores online debe estar entre 2 y 4.");
+            return;
+        }
+
+        playerCount = onlinePlayerCount;
+        CreatePlayers();
+        reserve.Clear();
+
+        Debug.Log("Datos de jugadores online preparados.");
+    }
+
+    public void SetOnlinePlayerHand(int playerIndex, List<DominoTile> receivedTiles)
+    {
+        if (playerIndex < 0 || playerIndex >= players.Count)
+        {
+            Debug.LogError("Índice de jugador inválido.");
+            return;
+        }
+
+        PlayerHand hand = players[playerIndex].hand;
+        hand.ClearHand();
+
+        foreach (DominoTile tile in receivedTiles)
+        {
+            hand.AddTile(tile);
+        }
+
+        Debug.Log("Mano recibida para " + players[playerIndex].playerName
+                + ". Cantidad de fichas: " + hand.TileCount);
     }
 
     [ContextMenu("Initialize Game")]

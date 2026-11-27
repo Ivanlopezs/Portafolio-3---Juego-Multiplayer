@@ -150,6 +150,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DominoTurnManager
   gameSetup: {fileID: 715578533}
   boardManager: {fileID: 456845202}
+  photonGameSyncManager: {fileID: 639107235}
   initializeOnStart: 1
   currentPlayerText: {fileID: 0}
   reserveCountText: {fileID: 0}
@@ -542,7 +543,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 611, y: -1}
+  m_AnchoredPosition: {x: 800, y: -1}
   m_SizeDelta: {x: 200.8996, y: 83.7537}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &559608345
@@ -675,7 +676,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -604, y: -10}
+  m_AnchoredPosition: {x: -800, y: -10}
   m_SizeDelta: {x: 200.8996, y: 83.7537}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &598133673
@@ -898,6 +899,76 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 602246102}
   m_CullTransparentMesh: 1
+--- !u!1 &639107234
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 639107237}
+  - component: {fileID: 639107236}
+  - component: {fileID: 639107235}
+  m_Layer: 0
+  m_Name: MultiplayerManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &639107235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 639107234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2219691559321b546a92676e24a42ae1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PhotonGameSyncManager
+  gameSetup: {fileID: 715578533}
+  turnManager: {fileID: 80719786}
+  boardManager: {fileID: 456845202}
+--- !u!114 &639107236
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 639107234}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa584fbee541324448dd18d8409c7a41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonView
+  ObservedComponentsFoldoutOpen: 1
+  Group: 0
+  prefixField: -1
+  Synchronization: 3
+  OwnershipTransfer: 0
+  observableSearch: 2
+  ObservedComponents: []
+  sceneViewId: 1
+  InstantiationId: 0
+  isRuntimeInstantiated: 0
+--- !u!4 &639107237
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 639107234}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1396.2928, y: 686.4081, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &642960776
 GameObject:
   m_ObjectHideFlags: 0
@@ -2200,8 +2271,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -447.7886}
-  m_SizeDelta: {x: -400, y: -895.5772}
+  m_AnchoredPosition: {x: -0.00024414062, y: -447.78857}
+  m_SizeDelta: {x: 0.00061035, y: -895.5772}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1405889349
 MonoBehaviour:
@@ -3374,3 +3445,4 @@ SceneRoots:
   - {fileID: 715578534}
   - {fileID: 456845203}
   - {fileID: 80719787}
+  - {fileID: 639107237}

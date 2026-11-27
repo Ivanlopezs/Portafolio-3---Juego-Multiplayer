@@ -33,6 +33,15 @@ public class DominoBoardManager : MonoBehaviour
         Debug.Log("Tablero preparado correctamente.");
     }
 
+    public void InitializeOnlineBoard()
+    {
+        board.ClearBoard();
+        usedTileIDs.Clear();
+        testTiles.Clear();
+        RefreshBoardVisuals();
+        Debug.Log("Tablero online preparado sin generar fichas nuevas.");
+    }
+
     public DominoBoardMoveResult TryPlaceTile(DominoTile tile, DominoPlacementSide side)
     {
         if (tile == null)
