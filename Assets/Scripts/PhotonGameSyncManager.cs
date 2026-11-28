@@ -222,6 +222,196 @@ public class PhotonGameSyncManager : MonoBehaviourPunCallbacks
     }
 
 
+    public void RequestOnlineDraw()
+    {
+        if (!PhotonNetwork.InRoom)
+            return;
+
+        syncView.RPC(
+            nameof(ReceiveDrawRequest),
+            RpcTarget.MasterClient
+        );
+    }
+
+    [PunRPC]
+    private void ReceiveDrawRequest(PhotonMessageInfo info)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        if (info.Sender == null || turnManager == null)
+            return;
+
+        turnManager.ValidateOnlineDrawRequest(
+            info.Sender.ActorNumber
+        );
+    }
+
+
+    public void SendDrawnTiles(
+        int playerIndex,
+        List<DominoTile> drawnTiles,
+        int remainingReserve)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        int count = drawnTiles.Count;
+
+        int[] tileIDs = new int[count];
+        int[] leftOrganisms = new int[count];
+        int[] rightOrganisms = new int[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            tileIDs[i] = drawnTiles[i].tileID;
+            leftOrganisms[i] = (int)drawnTiles[i].leftOrganism;
+            rightOrganisms[i] = (int)drawnTiles[i].rightOrganism;
+        }
+
+        Player targetPlayer = PhotonNetwork.PlayerList[playerIndex];
+
+        syncView.RPC(
+            nameof(ReceiveDrawnTiles),
+            targetPlayer,
+            playerIndex,
+            tileIDs,
+            leftOrganisms,
+            rightOrganisms,
+            remainingReserve
+        );
+
+        BroadcastReserveCount(remainingReserve);
+    }
+
+    [PunRPC]
+    private void ReceiveDrawnTiles(
+        int playerIndex,
+        int[] tileIDs,
+        int[] leftOrganisms,
+        int[] rightOrganisms,
+        int remainingReserve,
+        PhotonMessageInfo info)
+    {
+        if (info.Sender == null || !info.Sender.IsMasterClient)
+            return;
+
+        if (tileIDs == null ||
+            leftOrganisms == null ||
+            rightOrganisms == null ||
+            tileIDs.Length != leftOrganisms.Length ||
+            tileIDs.Length != rightOrganisms.Length)
+        {
+            Debug.LogError("Los datos de las fichas robadas no son válidos.");
+            return;
+        }
+
+        List<DominoTile> receivedTiles = new List<DominoTile>();
+
+        for (int i = 0; i < tileIDs.Length; i++)
+        {
+            receivedTiles.Add(new DominoTile(
+                tileIDs[i],
+                (OrganismType)leftOrganisms[i],
+                (OrganismType)rightOrganisms[i]
+            ));
+        }
+
+        if (turnManager != null)
+        {
+            turnManager.ApplyOnlineDrawnTiles(
+                playerIndex,
+                receivedTiles,
+                remainingReserve
+            );
+        }
+    }
+
+    public void BroadcastReserveCount(int count)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        syncView.RPC(
+            nameof(ReceiveReserveCount),
+            RpcTarget.AllBuffered,
+            count
+        );
+    }
+
+    [PunRPC]
+    private void ReceiveReserveCount(
+        int count,
+        PhotonMessageInfo info)
+    {
+        if (info.Sender == null || !info.Sender.IsMasterClient)
+            return;
+
+        if (turnManager != null)
+            turnManager.UpdateOnlineReserveCount(count);
+    }
+
+
+    public void RequestOnlinePass()
+    {
+        if (!PhotonNetwork.InRoom)
+            return;
+
+        syncView.RPC(
+            nameof(ReceivePassRequest),
+            RpcTarget.MasterClient
+        );
+    }
+
+    [PunRPC]
+    private void ReceivePassRequest(PhotonMessageInfo info)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        if (info.Sender == null || turnManager == null)
+            return;
+
+        turnManager.ValidateOnlinePassRequest(
+            info.Sender.ActorNumber
+        );
+    }
+
+    public void BroadcastAcceptedPass(
+        int playerIndex,
+        int consecutivePassCount)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        syncView.RPC(
+            nameof(ReceiveAcceptedPass),
+            RpcTarget.AllBuffered,
+            playerIndex,
+            consecutivePassCount
+        );
+    }
+
+    [PunRPC]
+    private void ReceiveAcceptedPass(
+        int playerIndex,
+        int consecutivePassCount,
+        PhotonMessageInfo info)
+    {
+        if (info.Sender == null || !info.Sender.IsMasterClient)
+            return;
+
+        if (turnManager != null)
+        {
+            turnManager.ApplySynchronizedOnlinePass(
+                playerIndex,
+                consecutivePassCount
+            );
+        }
+    }
+
+
+
     [PunRPC]
     private void ReceiveMoveRequest(
         int tileID,

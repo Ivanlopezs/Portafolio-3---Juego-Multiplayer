@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
 
@@ -12,16 +11,11 @@ public class DominoTurnManager : MonoBehaviour
     [SerializeField] private DominoBoardManager boardManager;
     [SerializeField] private PhotonGameSyncManager photonGameSyncManager;
 
+    [Header("Observer")]
+    [SerializeField] private DominoGameEvents gameEvents;
+
     [Header("Game Settings")]
     [SerializeField] private bool initializeOnStart = true;
-
-    [Header("UI References")]
-    [SerializeField] private TMP_Text currentPlayerText;
-    [SerializeField] private TMP_Text reserveCountText;
-    [SerializeField] private TMP_Text feedbackText;
-
-    [Header("Hand UI")]
-    [SerializeField] private PlayerHandUI playerHandUI;
 
     [Header("Placement Controls")]
     [SerializeField] private Button placeLeftButton;
@@ -31,10 +25,10 @@ public class DominoTurnManager : MonoBehaviour
     private List<DominoTile> reserve;
 
     private int currentPlayerIndex;
-
     private DominoRules rules;
-
     private DominoTile selectedTile;
+    private int consecutivePasses = 0;
+    private int onlineReserveCount = -1;
 
     public PlayerData CurrentPlayer
     {
@@ -47,10 +41,31 @@ public class DominoTurnManager : MonoBehaviour
         }
     }
 
-    public int ReserveCount => reserve != null ? reserve.Count : 0;
+    public int ReserveCount
+    {
+        get
+        {
+            if (GameSettings.SelectedMode == GameMode.Online &&
+                onlineReserveCount >= 0)
+            {
+                return onlineReserveCount;
+            }
+
+            return reserve != null ? reserve.Count : 0;
+        }
+    }
 
     private void Awake()
     {
+        if (gameEvents == null)
+        {
+            Debug.LogError(
+                "DominoGameEvents no está asignado. DominoTurnManager necesita el sistema Observer para funcionar."
+            );
+            enabled = false;
+            return;
+        }
+
         IOrganismCompatibilityStrategy compatibility = new EcosystemCompatibilityStrategy();
         rules = new DominoRules(compatibility);
     }
@@ -195,7 +210,12 @@ public class DominoTurnManager : MonoBehaviour
 
         reserve.RemoveAt(randomIndex);
 
+        onlineReserveCount = reserve.Count;
+        consecutivePasses = 0;
+
         photonGameSyncManager.BroadcastInitialTile(firstTile);
+
+        photonGameSyncManager.BroadcastReserveCount(reserve.Count);
 
         currentPlayerIndex = 0;
         selectedTile = null;
@@ -376,6 +396,8 @@ public class DominoTurnManager : MonoBehaviour
             " colocó una ficha en " + side
         );
 
+        gameEvents.NotifyTilePlaced(tile, currentPlayerIndex, side);
+
         selectedTile = null;
 
         UpdatePlacementButtons();
@@ -389,6 +411,20 @@ public class DominoTurnManager : MonoBehaviour
     {
         if (CurrentPlayer == null)
             return;
+
+        if (GameSettings.SelectedMode == GameMode.Online)
+        {
+            if (photonGameSyncManager == null)
+            {
+                Debug.LogError("No se ha asignado PhotonGameSyncManager.");
+                return;
+            }
+
+            photonGameSyncManager.RequestOnlineDraw();
+
+            ShowFeedback("Solicitando fichas al anfitrión...");
+            return;
+        }
 
         if (CanCurrentPlayerPlay())
         {
@@ -425,6 +461,11 @@ public class DominoTurnManager : MonoBehaviour
 
         UpdateTurnUI();
 
+        if (drawnTiles > 0)
+        {
+            gameEvents.NotifyTilesDrawn(currentPlayerIndex, drawnTiles);
+        }
+
         if (CanCurrentPlayerPlay())
         {
             ShowFeedback(
@@ -448,6 +489,20 @@ public class DominoTurnManager : MonoBehaviour
         if (CurrentPlayer == null)
             return;
 
+        if (GameSettings.SelectedMode == GameMode.Online)
+        {
+            if (photonGameSyncManager == null)
+            {
+                Debug.LogError("No se ha asignado PhotonGameSyncManager.");
+                return;
+            }
+
+            photonGameSyncManager.RequestOnlinePass();
+
+            ShowFeedback("Solicitando pasar el turno...");
+            return;
+        }
+
         if (reserve.Count > 0)
         {
             ShowFeedback(
@@ -465,6 +520,11 @@ public class DominoTurnManager : MonoBehaviour
         }
 
         Debug.Log(CurrentPlayer.playerName + " pasó su turno.");
+
+        gameEvents.NotifyPlayerPassed(
+            currentPlayerIndex,
+            CurrentPlayer.playerName
+        );
 
         selectedTile = null;
 
@@ -503,35 +563,30 @@ public class DominoTurnManager : MonoBehaviour
 
     private void UpdateTurnUI()
     {
-        if (CurrentPlayer != null && currentPlayerText != null)
-        {
-            currentPlayerText.text =
-                "Turno: " + CurrentPlayer.playerName;
-        }
+        if (CurrentPlayer == null)
+            return;
 
-        if (reserveCountText != null)
-        {
-            reserveCountText.text =
-                "Reserva: " + ReserveCount;
-        }
+        PlayerHand handToShow = CurrentPlayer.hand;
 
-        if (playerHandUI != null && CurrentPlayer != null)
+        // En online, cada cliente muestra únicamente su propia mano.
+        if (GameSettings.SelectedMode == GameMode.Online &&
+            photonGameSyncManager != null)
         {
-            PlayerHand handToShow = CurrentPlayer.hand;
+            int localIndex = photonGameSyncManager.LocalPlayerIndex;
 
-            if (GameSettings.SelectedMode == GameMode.Online &&
-                photonGameSyncManager != null)
+            if (localIndex >= 0 && localIndex < players.Count)
             {
-                int localIndex = photonGameSyncManager.LocalPlayerIndex;
-
-                if (localIndex >= 0 && localIndex < players.Count)
-                {
-                    handToShow = players[localIndex].hand;
-                }
+                handToShow = players[localIndex].hand;
             }
-
-            playerHandUI.ShowHand(handToShow);
         }
+
+        gameEvents.NotifyTurnChanged(
+            currentPlayerIndex,
+            CurrentPlayer.playerName,
+            handToShow
+        );
+
+        gameEvents.NotifyReserveChanged(ReserveCount);
     }
 
     public void OnOnlineHandReceived(int playerIndex)
@@ -545,10 +600,9 @@ public class DominoTurnManager : MonoBehaviour
             return;
         }
 
-        if (playerHandUI != null)
-        {
-            playerHandUI.ShowHand(players[playerIndex].hand);
-        }
+        currentPlayerIndex = 0;
+
+        UpdateTurnUI();
 
         Debug.Log(
             "Mano online recibida correctamente para: " +
@@ -557,6 +611,7 @@ public class DominoTurnManager : MonoBehaviour
 
         ShowFeedback("Tus fichas fueron recibidas correctamente.");
     }
+
 
     public void ValidateOnlineMoveRequest(
         int actorNumber,
@@ -623,6 +678,222 @@ public class DominoTurnManager : MonoBehaviour
         );
     }
 
+
+    public void ValidateOnlineDrawRequest(int actorNumber)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        Player[] roomPlayers = PhotonNetwork.PlayerList;
+        int actorIndex = -1;
+
+        for (int i = 0; i < roomPlayers.Length; i++)
+        {
+            if (roomPlayers[i].ActorNumber == actorNumber)
+            {
+                actorIndex = i;
+                break;
+            }
+        }
+
+        if (actorIndex == -1 || actorIndex != currentPlayerIndex)
+        {
+            Debug.LogWarning("Solicitud de robo fuera de turno.");
+            return;
+        }
+
+        if (reserve == null || reserve.Count == 0)
+        {
+            ShowFeedback("La reserva está vacía. Puedes pasar.");
+            return;
+        }
+
+        if (CanCurrentPlayerPlay())
+        {
+            ShowFeedback("El jugador ya tiene una ficha que puede colocar.");
+            return;
+        }
+
+        List<DominoTile> drawnTiles = new List<DominoTile>();
+
+        while (reserve.Count > 0 && !CanCurrentPlayerPlay())
+        {
+            int lastIndex = reserve.Count - 1;
+
+            DominoTile drawnTile = reserve[lastIndex];
+
+            reserve.RemoveAt(lastIndex);
+
+            CurrentPlayer.hand.AddTile(drawnTile);
+            drawnTiles.Add(drawnTile);
+
+            if (CanPlayTile(drawnTile))
+                break;
+        }
+
+        if (drawnTiles.Count == 0)
+            return;
+
+        onlineReserveCount = reserve.Count;
+
+        photonGameSyncManager.SendDrawnTiles(
+            actorIndex,
+            drawnTiles,
+            reserve.Count
+        );
+
+        UpdateTurnUI();
+
+        Debug.Log(
+            "El jugador " + actorIndex +
+            " robó " + drawnTiles.Count + " ficha(s)."
+        );
+    }
+
+
+    public void ApplyOnlineDrawnTiles(
+        int playerIndex,
+        List<DominoTile> drawnTiles,
+        int remainingReserve)
+    {
+        if (players == null ||
+            playerIndex < 0 ||
+            playerIndex >= players.Count)
+        {
+            Debug.LogError("Jugador inválido al recibir fichas robadas.");
+            return;
+        }
+
+        if (drawnTiles == null)
+            return;
+
+        onlineReserveCount = remainingReserve;
+        gameEvents.NotifyReserveChanged(remainingReserve);
+
+        if (!PhotonNetwork.IsMasterClient &&
+            photonGameSyncManager.LocalPlayerIndex == playerIndex)
+        {
+            foreach (DominoTile tile in drawnTiles)
+            {
+                players[playerIndex].hand.AddTile(tile);
+            }
+
+            UpdateTurnUI();
+            gameEvents.NotifyTilesDrawn(playerIndex, drawnTiles.Count);
+
+            ShowFeedback(
+                "Robaste " + drawnTiles.Count +
+                " ficha(s). Revisa tu mano."
+            );
+        }
+
+        Debug.Log("Sincronización del robo completada.");
+    }
+
+    public void UpdateOnlineReserveCount(int count)
+    {
+        onlineReserveCount = count;
+        gameEvents.NotifyReserveChanged(count);
+        UpdateTurnUI();
+    }
+
+
+    public void ValidateOnlinePassRequest(int actorNumber)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        Player[] roomPlayers = PhotonNetwork.PlayerList;
+        int actorIndex = -1;
+
+        for (int i = 0; i < roomPlayers.Length; i++)
+        {
+            if (roomPlayers[i].ActorNumber == actorNumber)
+            {
+                actorIndex = i;
+                break;
+            }
+        }
+
+        if (actorIndex == -1 || actorIndex != currentPlayerIndex)
+        {
+            Debug.LogWarning("Solicitud de pase fuera de turno.");
+            return;
+        }
+
+        if (reserve == null || reserve.Count > 0)
+        {
+            ShowFeedback("Todavía quedan fichas en la reserva.");
+            return;
+        }
+
+        if (CanCurrentPlayerPlay())
+        {
+            ShowFeedback("Tienes una jugada disponible. No puedes pasar.");
+            return;
+        }
+
+        consecutivePasses++;
+
+        photonGameSyncManager.BroadcastAcceptedPass(
+            actorIndex,
+            consecutivePasses
+        );
+    }
+
+
+    public void ApplySynchronizedOnlinePass(
+    int playerIndex,
+    int synchronizedPassCount)
+    {
+        if (players == null ||
+            playerIndex < 0 ||
+            playerIndex >= players.Count)
+        {
+            Debug.LogError("Jugador inválido al sincronizar el pase.");
+            return;
+        }
+
+        if (playerIndex != currentPlayerIndex)
+        {
+            Debug.LogWarning("El pase recibido no corresponde al turno actual.");
+            return;
+        }
+
+        consecutivePasses = synchronizedPassCount;
+
+        gameEvents.NotifyPlayerPassed(
+            playerIndex,
+            players[playerIndex].playerName
+        );
+
+        Debug.Log(
+            players[playerIndex].playerName + " pasó su turno."
+        );
+
+        selectedTile = null;
+
+        UpdatePlacementButtons();
+
+        AdvanceTurn();
+
+        if (consecutivePasses >= players.Count)
+        {
+            gameEvents.NotifyGameBlocked();
+
+            ShowFeedback(
+                "¡Partida bloqueada! Todos los jugadores han pasado."
+            );
+
+            Debug.Log("La partida online está bloqueada.");
+        }
+        else
+        {
+            ShowFeedback("Turno pasado correctamente.");
+        }
+    }
+
+
     public void ApplySynchronizedOnlineMove(
         int playerIndex,
         DominoTile tile,
@@ -662,6 +933,10 @@ public class DominoTurnManager : MonoBehaviour
             actorHand.RemoveTile(ownedTile);
         }
 
+        gameEvents.NotifyTilePlaced(tile, playerIndex, side);
+
+        consecutivePasses = 0;
+
         selectedTile = null;
 
         Debug.Log(
@@ -695,9 +970,7 @@ public class DominoTurnManager : MonoBehaviour
     private void ShowFeedback(string message)
     {
         Debug.Log(message);
-
-        if (feedbackText != null)
-            feedbackText.text = message;
+        gameEvents.NotifyFeedback(message);
     }
 
 }
